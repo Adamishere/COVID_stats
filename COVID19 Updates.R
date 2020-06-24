@@ -1,5 +1,6 @@
 library(dplyr)
 library(ggplot2)
+#setwd("E:/Work/R workspace/COVID/COVID_stats/")
 
 #loc_hist<-"https://covidtracking.com/api/v1/us/daily.csv"
 #covid_hist<-as.data.frame(read.csv(loc_hist))
@@ -65,7 +66,7 @@ gg_key<-ggplot(#data=state_results,
       theme(legend.position = "none")
 gg_key
 
-# ggsave("C:/Users/21509/OneDrive - ICF/_Common Programs/R/COVID/COVID19 Hospitalizations by Key States.png",gg)
+# ggsave("./COVID19 Hospitalizations by Key States.png",gg)
 
 
 #Cumulative Positive Count
@@ -119,7 +120,7 @@ gg_all<-ggplot(data=state_results,
   theme(legend.position = "none")
 gg_all
 
-# ggsave("C:/Users/21509/OneDrive - ICF/_Common Programs/R/COVID/COVID19 Hospitalizations by All States.png",gg,
+# ggsave("./COVID19 Hospitalizations by All States.png",gg,
 #        , width = 12, height = 10)
 gg_all_pp<-ggplot(data=state_results,
                #data=state_results[state_results$state_str %in% state_list,] ,
