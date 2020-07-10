@@ -2,19 +2,20 @@
 library(gridExtra)
 library(dplyr)
 library(ggplot2)
+library(lubridate)
+library(zoo)
+library(tidyverse)
 #install.packages("dplyr")
 #setwd("E:/Work/R workspace/COVID/COVID_stats/")
 
 #loc_hist<-"https://covidtracking.com/api/v1/us/daily.csv"
 #covid_hist<-as.data.frame(read.csv(loc_hist))
 
+#Read from website:
 loc_hist_state<-"https://covidtracking.com/api/v1/states/daily.csv"
 covid_hist_state<-as.data.frame(read.csv(loc_hist_state))
 
-# 
-# names(covid_hist_state)
-# as.Date.character(covid_hist_state$date, "%Y%m%d")
-
+#Data prep
 state_results <-covid_hist_state %>%
                 mutate(date = as.Date.character(date, "%Y%m%d"))%>%
                 mutate(state_str = as.character(state))%>%
@@ -30,33 +31,38 @@ state_results <-covid_hist_state %>%
                 mutate(pct_pos_diff = pos_diff/(pos_diff+neg_diff)) %>%
                 arrange(state,desc(date))
 
-#state_results[state_results$state_str =="FL","hosp_diff"]<-state_results[state_results$state_str =="FL","hospitalizedIncrease"]
+#subset to post 1st wave cases
 state_results<-state_results[state_results$date > as.Date.character("2020-03-25", "%Y-%m-%d"),]
 
-#head(state_results[state_results$state_str =="OK",c("date","positive","negative","pos_diff","neg_diff","pct_pos_diff")])
-#head(state_results[state_results$state_str =="OK",c("date","hospitalizedCurrently","hosp_diff","pct_pos_diff")])
-# head(state_results)
-
-
-gg_tx<-ggplot(#data=state_results,
+#Individual State Output
+gg_state_hosp<-ggplot(#data=state_results,
   data=state_results[state_results$state_str %in% "TX",] ,
-  aes(x=date,y=hosp_diff))+
+  aes(x=date,
+      #y=pct_pos))+
+      y=death_diff))+
+      #y=hosp_diff))+
   geom_line() +   geom_smooth()+
   geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
   geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
-  geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
+  geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="green")+
   geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), 
                 xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), 
                 ymin=-Inf, ymax=Inf),fill="red",alpha=0.005)+
-  ggtitle("Hospitalizations by Texas")+
-  theme(legend.position = "none")+ annotate("text", label = "1 week after Memorial Day", x = as.Date.character("2020-05-25", "%Y-%m-%d"), y = 500, size = 6, colour = "Black")
-gg_tx
-head(state_results[state_results$state_str %in% "TX",c("date","hospitalizedCurrently")])
-                   
-state_list<-c("CA","WA","GA","TX","AZ",
-              "SC","AL","MD","FL")
+  ggtitle("Change in Deaths by State")+
+  theme(legend.position = "none")+ 
+    annotate("text", label = "1 week after Memorial Day",
+             x = as.Date.character("2020-05-25", "%Y-%m-%d"),
+             y = -10, size = 6, colour = "Black")
+  
+gg_state_hosp
+
+#Key State Analysis                
+#state_list<-c("CA","WA","GA","TX","AZ",
+#              "SC","AL","MD","FL")
+#state_list<-c("TX","FL","AZ","GA","WA")
+state_list<-c("TX","FL","AZ")
 #state_list<-c("TX","AZ","FL","NY","NJ","MA","WA")
-gg_key<-ggplot(#data=state_results,
+gg_key_hosp<-ggplot(#data=state_results,
            data=state_results[state_results$state_str %in% state_list,] ,
            aes(x=date,y=hospitalizedCurrently,
                group=state, 
@@ -71,18 +77,11 @@ gg_key<-ggplot(#data=state_results,
       facet_wrap(~state,scales = "free_y")+
       ggtitle("Hospitalizations by Key States")+
       theme(legend.position = "none")
-gg_key
-
-# ggsave("./COVID19 Hospitalizations by Key States.png",gg)
-state_list<-c("TX","FL","AZ","GA","WA")
-#state_list<-c("TX","FL","AZ")
-#library(zoo)
-#install.packages("zoo")
-
+gg_key_hosp
 
 
 # Stack charts ------------------------------------------------------------
-gg_death_key<-ggplot(#data=state_results,
+gg_key_death<-ggplot(#data=state_results,
   data=state_results[state_results$state_str %in% state_list,] ,
   aes(x=date,y=death_diff,
       group=state, 
@@ -103,14 +102,14 @@ gg_death_key<-ggplot(#data=state_results,
              nrow=1)+
   ggtitle("Daily Death (Moving Average) by Key States")+
   theme(legend.position = "none")
-gg_death_key
+gg_key_death
 
-gg_pos_key<-ggplot(#data=state_results,
+gg_key_pos<-ggplot(#data=state_results,
   data=state_results[state_results$state_str %in% state_list,] ,
   aes(x=date,y=pos_diff,
       group=state, 
       color=state))+
-  #geom_line()+
+  geom_line()+
   geom_smooth()+
   geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
   geom_vline(xintercept = as.Date.character("2020-06-08", "%Y-%m-%d"),color="blue")+
@@ -125,14 +124,14 @@ gg_pos_key<-ggplot(#data=state_results,
              nrow=1)+
   ggtitle("Daily Positives by Key States")+
   theme(legend.position = "none")
-gg_pos_key
+gg_key_pos
 
-gg_PCTpos_key<-ggplot(#data=state_results,
+gg_key_pctpos<-ggplot(#data=state_results,
                    data=state_results[state_results$state_str %in% state_list,] ,
                    aes(x=date,y=pct_pos_diff,
                        group=state, 
                        color=state))+
-  #geom_line()+
+  geom_line()+
   geom_smooth()+
   geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
   geom_vline(xintercept = as.Date.character("2020-06-08", "%Y-%m-%d"),color="blue")+
@@ -149,9 +148,9 @@ gg_PCTpos_key<-ggplot(#data=state_results,
                                                     decimal.mark = '.'))+
   ggtitle("Daily Percent Positives (Smoothed) by Key States")+
   theme(legend.position = "none")
-gg_PCTpos_key
+gg_key_pctpos
 
-gg_hosp_key<-ggplot(#data=state_results,
+gg_key_hosp<-ggplot(#data=state_results,
   data=state_results[state_results$state_str %in% state_list,] ,
   aes(x=date,y=hospitalizedCurrently),
       group=state, 
@@ -170,75 +169,15 @@ gg_hosp_key<-ggplot(#data=state_results,
              nrow=1)+
   ggtitle("Current Hospitalizations by Key States")+
   theme(legend.position = "none")
-gg_hosp_key
+gg_key_hosp
 
-grid.arrange(gg_PCTpos_key,gg_hosp_key,gg_death_key) 
-
-
-
-#Cumulative Positive Count
-
-gg_cum_cases<-ggplot(#data=state_results,
-  data=state_results[state_results$state_str %in% state_list,] ,
-  aes(x=date,y=positive,
-      group=state, 
-      color=state))+
-  geom_line()+
-  geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
-  geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
-  geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
-  geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), 
-                xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), 
-                ymin=-Inf, ymax=Inf),fill="white",alpha=0.005)+
-  facet_wrap(~state,scales = "free_y")+
-  ggtitle("Positives by Key States")+
-  theme(legend.position = "none")
-gg_cum_cases
- 
-state_results[state_results$state_str %in% state_list,"pct_pos_diff"]
-
-gg_all<-ggplot(data=state_results,
-  #data=state_results[state_results$state_str %in% state_list,] ,
-  aes(x=date,y=hospitalizedCurrently,
-      group=state, 
-      color=state))+
-  geom_line()+  geom_smooth()+
-  geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
-  geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
-  geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
-  geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), ymin=0, ymax=Inf))+
-  facet_wrap(~state,scales = "free_y")+
-  ggtitle("Hospitalizations by All States")+
-  theme(legend.position = "none")
-gg_all
-
-# ggsave("./COVID19 Hospitalizations by All States.png",gg,
-#        , width = 12, height = 10)
-gg_all_pp<-ggplot(data=state_results,
-               #data=state_results[state_results$state_str %in% state_list,] ,
-               aes(x=date,y=pct_pos_diff,
-                   group=state, 
-                   color=state))+
-  geom_line()+  geom_smooth()+
-  geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
-  geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
-  geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
-  #geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), ymin=0, ymax=Inf))+
-  facet_wrap(~state)+ 
-  scale_y_continuous(limits = c(0, .30))+
-  ggtitle("Pct Positives by All States")
-  #theme(legend.position = "none")
-gg_all_pp
+#Print combined output:
+grid.arrange(gg_key_pctpos, gg_key_hosp, gg_key_death) 
 
 
-(33+50+44+57+21+10+27)/7
-(6+20+36+33+21+31+11)/7
 
 #Weekly aggregate results
-#install.packages("tidyverse")
-library(tidyverse)
-library(lubridate)
-tx<-state_results[state_results$state_str %in% "WA",c("pct_pos_diff","date","death_diff","hosp_diff")]
+tx<-state_results[state_results$state_str %in% "TX",c("hospitalizedCurrently","pct_pos_diff","date","death_diff","hosp_diff")]
 
 weeklydeath<-tx %>% 
   group_by(week = week(date)) %>% 
@@ -246,27 +185,118 @@ weeklydeath<-tx %>%
 
 weeklyhosp<-tx %>% 
   group_by(week = week(date)) %>% 
-  summarise(x = round(mean(hosp_diff),2))
+  summarise(x = round(mean(hospitalizedCurrently),2))
 
 weeklypctpos<-tx %>% 
   group_by(week = week(date)) %>% 
   summarise(x = round(mean(pct_pos_diff),2))
 
-cbind(weeklypctpos$x,weeklyhosp$x,weeklydeath$x)
+wksummary<-cbind(pctpos=weeklypctpos$x,hosp=weeklyhosp$x,death=weeklydeath$x)
 
 
-plot(lag(weeklydeath$x,0), lag(weeklypctpos$x,3))
-cor(lag(weeklydeath$x,0), lag(weeklypctpos$x,3), use = "complete.obs")
 
-cbind(lag(weeklydeath$x,0), lag(weeklyhosp$x,3))
+#NCHS Weekly Deaths by State
+library(jsonlite)
+#library(httr)
+#install.packages("RSocrata")
+library(RSocrata)
 
-plot(weeklydeath)
+#https://data.cdc.gov/NCHS/Weekly-Counts-of-Deaths-by-State-and-Select-Causes/muzy-jte6
+#https://data.cdc.gov/login
 
-  DEATH HOSP
+path<-"https://data.cdc.gov/resource/muzy-jte6.json" #all causes
+#setwd("./COVID/COVID_stats")
 
-  1     
-  2     1
-  3     2
-  4     3
-  
-write.csv(tx, "output.csv")
+#get API key but keep it secret on Git
+fileName <- "../CDC_app_token.txt"
+key<-readChar(fileName, file.info(fileName)$size)
+wd_json<-read.socrata(path, app_token = key)
+
+#convert to data frame
+wd_df<-as.data.frame(wd_json)
+
+#note date as string
+table(wd_df$week_ending_date)
+table(wd_df$jurisdiction_of_occurrence)
+
+#create date variables of week end
+wd_df$week<-as.Date.character(wd_df$week_ending_date, "%m/%d/%Y")
+wd_df$state<-wd_df$jurisdiction_of_occurrence
+
+#merge on abreviation
+state_dict<-data.frame((cbind(name=datasets::state.name, 
+                              abv=datasets::state.abb)),stringsAsFactors = FALSE)
+wd_df<-merge(wd_df, state_dict, 
+             by.x = "jurisdiction_of_occurrence", 
+             by.y = "name")
+
+#set missing to zero
+wd_df$flupnu<-wd_df$influenza_and_pneumonia_j09_j18
+wd_df[is.na(wd_df$flupnu),"flupnu"]<-0
+
+wd2020<-wd_df[wd_df$week > as.Date.character("2020-03-25", "%Y-%m-%d"),]
+
+state_list<-c("TX","FL","AZ","GA","WA")
+gg_weekly_death<-ggplot(#data=wd2020,
+               data=wd2020[wd2020$abv %in% state_list,] ,
+               aes(x=week_ending_date,y=flupnu,
+                   group=state, 
+                   color=state))+
+  geom_line()+  geom_smooth()+
+  #geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
+ # geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
+  #geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
+  #geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), ymin=0, ymax=Inf))+
+  facet_wrap(~state,scales = "free_y")+
+  ggtitle("Flu & Pneumonia by All States")+
+  theme(legend.position = "none")
+gg_weekly_death
+
+
+
+path2<-"https://data.cdc.gov/resource/r8kw-7aab.json" #covid
+#get API key but keep it secret on Git
+fileName <- "../CDC_app_token.txt"
+key<-readChar(fileName, file.info(fileName)$size)
+
+cwd_json<-read.socrata(path2, app_token = key)
+#convert to data frame
+cwd_df<-as.data.frame(wd_json)
+
+#note date as string
+table(cwd_df$end_week)
+table(cwd_df$state)
+substr()
+#create date variables of week end
+cwd_df$week<-as.Date.character(substr(cwd_df$end_week,1,10), "%Y-%m-%d")
+#cwd_df$state<-cwd_df$jurisdiction_of_occurrence
+
+#merge on abreviation
+state_dict<-data.frame((cbind(name=datasets::state.name, 
+                              abv=datasets::state.abb)),stringsAsFactors = FALSE)
+cwd_df<-merge(cwd_df, state_dict, 
+             by.x = "state", 
+             by.y = "name")
+
+#set missing to zero
+cwd_df$cdeath<-as.numeric(cwd_df$covid_deaths)
+cwd_df[is.na(cwd_df$cdeath),"cdeath"]<-0
+
+cwd2020<-cwd_df[cwd_df$week > as.Date.character("2020-03-25", "%Y-%m-%d"),]
+
+state_list<-c("TX","FL","AZ","GA","WA")
+gg_weekly_cvdeath<-ggplot(#data=cwd2020,
+  data=cwd2020[cwd2020$abv %in% state_list,] ,
+  aes(x=week,y=cdeath,
+      group=state, 
+      color=state))+
+  geom_line()+  geom_smooth()+
+  #geom_vline(xintercept = as.Date.character("2020-05-25", "%Y-%m-%d"),color="red")+
+  # geom_vline(xintercept = as.Date.character("2020-06-01", "%Y-%m-%d"),color="blue")+
+  #geom_vline(xintercept = as.Date.character(Sys.Date(), "%Y-%m-%d")-1,color="black")+
+  #geom_rect(aes(xmin=as.Date.character("2020-05-25", "%Y-%m-%d"), xmax=as.Date.character("2020-06-01", "%Y-%m-%d"), ymin=0, ymax=Inf))+
+  facet_wrap(~state,scales = "free_y")+
+  ggtitle("COVID cases by All States")+
+  theme(legend.position = "none")
+gg_weekly_cvdeath
+
